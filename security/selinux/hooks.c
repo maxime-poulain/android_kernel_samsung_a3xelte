@@ -108,7 +108,7 @@ static inline unsigned int cmp_sec_integrity(void)
 			(current->mm->pgd != current->cred->bp_pgd)));
 			
 }
-inline void rkp_print_debug(void)
+static inline void rkp_print_debug(void)
 {
 	u64 pgd;
 	struct cred *cred;
@@ -3757,7 +3757,7 @@ static int selinux_cred_alloc_blank(struct cred *cred, gfp_t gfp)
 /*
  * detach and free the LSM part of a set of credentials
  */
-static void selinux_cred_free(struct cred *cred)
+static inline void selinux_cred_free(struct cred *cred)
 {
 	struct task_security_struct *tsec = cred->security;
 
