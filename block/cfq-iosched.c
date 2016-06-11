@@ -21,16 +21,16 @@
  * tunables
  */
 /* max queue in one round of service */
-static const int cfq_quantum = 8;
+static const int cfq_quantum = 2;
 static const int cfq_fifo_expire[2] = { HZ / 4, HZ / 8 };
 /* maximum backwards seek, in KiB */
 static const int cfq_back_max = 16 * 1024;
 /* penalty of a backwards seek */
-static const int cfq_back_penalty = 2;
+static const int cfq_back_penalty = 1;
 static const int cfq_slice_sync = HZ / 10;
 static int cfq_slice_async = HZ / 25;
-static const int cfq_slice_async_rq = 2;
-static int cfq_slice_idle = HZ / 125;
+static const int cfq_slice_async_rq = 1;
+static int cfq_slice_idle = 0;
 static int cfq_group_idle = HZ / 125;
 static const int cfq_target_latency = HZ * 3/10; /* 300 ms */
 static const int cfq_hist_divisor = 4;
@@ -4596,7 +4596,7 @@ static int __init cfq_init(void)
 	if (!cfq_slice_async)
 		cfq_slice_async = 1;
 	if (!cfq_slice_idle)
-		cfq_slice_idle = 1;
+		cfq_slice_idle = 0;
 
 #ifdef CONFIG_CFQ_GROUP_IOSCHED
 	if (!cfq_group_idle)
