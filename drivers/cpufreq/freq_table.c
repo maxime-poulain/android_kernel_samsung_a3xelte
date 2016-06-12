@@ -16,6 +16,8 @@
 #include <linux/init.h>
 #include <linux/cpufreq.h>
 
+#include <mach/regs-clock-exynos7580.h>
+
 /*********************************************************************
  *                     FREQUENCY TABLE HELPERS                       *
  *********************************************************************/
@@ -42,8 +44,8 @@ int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
 			max_freq = freq;
 	}
 
-	policy->min = policy->cpuinfo.min_freq = min_freq;
-	policy->max = policy->cpuinfo.max_freq = max_freq;
+	policy->min = policy->cpuinfo.min_freq = min_freq = EXYNOS7580_REGULAR_MIN_FREQ;
+	policy->max = policy->cpuinfo.max_freq = max_freq = EXYNOS7580_REGULAR_MAX_FREQ;
 
 	if (policy->min == ~0)
 		return -EINVAL;

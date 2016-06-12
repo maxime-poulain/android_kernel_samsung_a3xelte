@@ -46,12 +46,15 @@ u32 re_err(void)
 
 void cal_init(void)
 {
-	u32 i;
+	u32 i, table_ver;
 
 	for (i = 0; i < 4; i++) {
 		((u32*)(&asv_bank0))[i] = ((u32*)(CHIPID_ASV_TBL_BASE))[i];
 		((u32*)(&asv_bank2))[i] = ((u32*)(CHIPID_ASV_TBL_BASE + 0x0020))[i];
 	}
+
+	table_ver = cal_get_table_ver();
+	pr_info("cpu asv version is : %u", table_ver);
 
 	switch (cal_get_table_ver()) {
 	case 0:	/* 1st LOT 2nd LOT EVT0.0 */ /* fall through */
@@ -190,7 +193,7 @@ u32 cal_check_ssa(u32 id, u32 uvol)
 
 u32 cal_get_volt(u32 id, s32 level)
 {
-	u32 volt, asvgrp, idx;
+	u32 freq, volt, asvgrp, idx;
 	u32 minlvl = cal_get_min_lv(id);
 	const u32 *p_table;
 
@@ -216,10 +219,13 @@ u32 cal_get_volt(u32 id, s32 level)
 	if (p_table == NULL)
 		return 0;
 
+	freq = cal_get_freq(id, level);
 	asvgrp = cal_get_asv_grp(id, level);
 
 	volt = p_table[asvgrp + 1];
 	volt = cal_check_ssa(id, volt);
+
+	pr_info("freq: %d, voltage: %d, asv group: %d", freq, volt, asvgrp);
 
 	return volt;
 
