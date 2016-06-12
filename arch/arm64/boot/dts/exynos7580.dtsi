@@ -625,8 +625,8 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&i2c6_bus>;
-		/* pinctrl-0 = <&i2c_nfc_bus>; */
+		/* pinctrl-0 = <&i2c6_bus>; */
+		pinctrl-0 = <&i2c_nfc_bus>;
 		clocks = <&clock 130>, <&clock 130>;
 		clock-names = "rate_i2c", "gate_i2c";
 		status = "disabled";
@@ -639,7 +639,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&i2c7_bus>;
+		pinctrl-0 = <&i2c6_bus>;
 		clocks = <&clock 131>, <&clock 131>;
 		clock-names = "rate_i2c", "gate_i2c";
 		status = "disabled";
@@ -652,7 +652,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&i2c_nfc_bus>;
+		pinctrl-0 = <&i2c7_bus>;
 		clocks = <&clock 132>, <&clock 132>;
 		clock-names = "rate_i2c", "gate_i2c";
 		status = "disabled";
@@ -789,14 +789,14 @@
 		status = "disabled";
 	};
 
-	watchdog@101B0000 {
+	watchdog@101C0000 {
 		compatible = "samsung,s3c2410-wdt";
-		reg = <0x0 0x101B0000 0x0 0x100>;
+		reg = <0x0 0x101C0000 0x0 0x100>;
 		interrupts = <0 100 0>;
 		clocks = <&clock 1030>, <&clock 1030>;
 		clock-names = "rate_watchdog", "gate_watchdog";
 		timeout-sec = <30>;
-		pmu_wdt_reset_type = <1>;
+		pmu_wdt_reset_type = <0>;
 	};
 
 	usb@13580000 {
