@@ -48,6 +48,8 @@
 #include "ist30xxc_cmcs.h"
 #endif
 
+#include <linux/i2c/ist30xxc.h>
+
 #define MAX_ERR_CNT			(100)
 #define EVENT_TIMER_INTERVAL		(HZ * timer_period_ms / 1000)
 u32 event_ms = 0, timer_ms = 0;
@@ -411,6 +413,11 @@ void ist30xx_gesture_cmd(struct ist30xx_data *data, int cmd)
 }
 #endif
 
+u64 last_input_time = 0;
+inline u64 get_last_input_time() {
+	return last_input_time;
+}
+
 #define PRESS_MSG_MASK		(0x01)
 #define MULTI_MSG_MASK		(0x02)
 #define TOUCH_DOWN_MESSAGE	("p")
@@ -421,10 +428,12 @@ void print_tsp_event(struct ist30xx_data *data, finger_info *finger, u32 z_value
 {
 	int idx = finger->bit_field.id - 1;
 	bool press;
+	u64 current_time;
 
 	press = PRESSED_FINGER(data->t_status, finger->bit_field.id);
 
 	if (press) {
+		current_time = ktime_to_us(ktime_get());
 		input_report_key(data->input_dev, BTN_TOUCH, 1);
 		input_report_key(data->input_dev, BTN_TOOL_FINGER, 1);
 		if (tsp_touched[idx] == false) {
@@ -452,6 +461,8 @@ void print_tsp_event(struct ist30xx_data *data, finger_info *finger, u32 z_value
 
 		data->lx[idx] = finger->bit_field.x;
 		data->ly[idx] = finger->bit_field.y;
+
+		last_input_time = current_time;
 	} else {
 		if (tsp_touched[idx] == true) {
 			/* touch up */
@@ -660,7 +671,8 @@ static void report_input_data(struct ist30xx_data *data, int finger_counts,
 
 	data->irq_err_cnt = 0;
 	data->scan_retry = 0;
-
+	
+	last_input_time = ktime_to_us(ktime_get());
 	input_sync(data->input_dev);
 }
 
