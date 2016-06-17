@@ -195,7 +195,7 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
 #ARCH		?= $(SUBARCH)
 #CROSS_COMPILE	?= $(CONFIG_CROSS_COMPILE:"%"=%)
 ARCH		= arm64
-CROSS_COMPILE = ccache /home/khaon/android/linaro-5.3/bin/aarch64-linux-android-
+CROSS_COMPILE = ccache /home/khaon/android/linaro-64/bin/aarch64-linux-android-
 
 # Architecture as present in compile.h
 UTS_MACHINE 	:= $(ARCH)
@@ -383,6 +383,9 @@ KBUILD_CFLAGS   := -O3 -mcpu=cortex-a53 -mtune=cortex-a53 \
 		   -Wno-maybe-uninitialized \
 		   -Wno-format-security \
 		   -Wno-array-bounds \
+		   -Wno-tautological-compare \
+		   -Wno-unused-const-variable \
+		   -Wno-shift-overflow \
 		   -fno-delete-null-pointer-checks \
 		   -fdiagnostics-show-option -Werror
 KBUILD_AFLAGS_KERNEL :=
