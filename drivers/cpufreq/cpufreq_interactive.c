@@ -121,8 +121,8 @@ struct cpufreq_interactive_tunables {
 	int timer_slack_val;
 	bool io_is_busy;
 	/* The amount of time the touch boost should last */
-#define DEFAULT_TOUCHBOOST_TIMEOUT 350000
-	unsigned long touchboost_timeout;
+#define DEFAULT_TOUCHBOOST_DURATION 350000
+	unsigned long touchboost_duration;
 
 #define TASK_NAME_LEN 15
 	/* realtime thread handles frequency scaling */
@@ -430,7 +430,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 	do_div(cputime_speedadj, delta_time);
 	loadadjfreq = (unsigned int)cputime_speedadj * 100;
 	cpu_load = loadadjfreq / pcpu->target_freq;
-	boosted = now < get_last_input_time() + tunables->touchboost_timeout;
+	boosted = now < get_last_input_time() + tunables->touchboost_duration;
 
 	if (cpu_load >= tunables->go_hispeed_load || boosted) {
 		if (pcpu->target_freq < tunables->hispeed_freq) {
@@ -948,13 +948,13 @@ static ssize_t store_io_is_busy(struct cpufreq_interactive_tunables *tunables,
 	return count;
 }
 
-static ssize_t show_touchboost_timeout(struct cpufreq_interactive_tunables *tunables,
+static ssize_t show_touchboost_duration(struct cpufreq_interactive_tunables *tunables,
 		char *buf)
 {
-	return sprintf(buf, "%lu\n", tunables->touchboost_timeout);
+	return sprintf(buf, "%lu\n", tunables->touchboost_duration);
 }
 
-static ssize_t store_touchboost_timeout(struct cpufreq_interactive_tunables *tunables,
+static ssize_t store_touchboost_duration(struct cpufreq_interactive_tunables *tunables,
 		const char *buf, size_t count)
 {
 	int ret;
@@ -964,7 +964,7 @@ static ssize_t store_touchboost_timeout(struct cpufreq_interactive_tunables *tun
 	if (ret < 0)
 		return ret;
 
-	tunables->touchboost_timeout = val;
+	tunables->touchboost_duration = val;
 	return count;
 }
 
@@ -1012,7 +1012,7 @@ show_store_gov_pol_sys(min_sample_time);
 show_store_gov_pol_sys(timer_rate);
 show_store_gov_pol_sys(timer_slack);
 show_store_gov_pol_sys(io_is_busy);
-show_store_gov_pol_sys(touchboost_timeout);
+show_store_gov_pol_sys(touchboost_duration);
 
 #define gov_sys_attr_rw(_name)						\
 static struct global_attr _name##_gov_sys =				\
@@ -1034,7 +1034,7 @@ gov_sys_pol_attr_rw(min_sample_time);
 gov_sys_pol_attr_rw(timer_rate);
 gov_sys_pol_attr_rw(timer_slack);
 gov_sys_pol_attr_rw(io_is_busy);
-gov_sys_pol_attr_rw(touchboost_timeout);
+gov_sys_pol_attr_rw(touchboost_duration);
 
 
 
@@ -1048,7 +1048,7 @@ static struct attribute *interactive_attributes_gov_sys[] = {
 	&timer_rate_gov_sys.attr,
 	&timer_slack_gov_sys.attr,
 	&io_is_busy_gov_sys.attr,
-	&touchboost_timeout_gov_sys.attr,
+	&touchboost_duration_gov_sys.attr,
 	NULL,
 };
 
@@ -1067,7 +1067,7 @@ static struct attribute *interactive_attributes_gov_pol[] = {
 	&timer_rate_gov_pol.attr,
 	&timer_slack_gov_pol.attr,
 	&io_is_busy_gov_pol.attr,
-	&touchboost_timeout_gov_pol.attr,
+	&touchboost_duration_gov_pol.attr,
 	NULL,
 };
 
@@ -1086,7 +1086,7 @@ static const char *interactive_sysfs[] = {
 	"timer_rate",
 	"timer_slack",
 	"io_is_busy",
-	"touchboost_timeout"
+	"touchboost_duration"
 };
 #endif
 
@@ -1188,7 +1188,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			tunables->min_sample_time = DEFAULT_MIN_SAMPLE_TIME;
 			tunables->timer_rate = DEFAULT_TIMER_RATE;
 			tunables->timer_slack_val = DEFAULT_TIMER_SLACK;
-			tunables->touchboost_timeout = DEFAULT_TOUCHBOOST_TIMEOUT;
+			tunables->touchboost_duration = DEFAULT_TOUCHBOOST_DURATION;
 		} else {
 			memcpy(tunables, tuned_parameters[policy->cpu], sizeof(*tunables));
 			kfree(tuned_parameters[policy->cpu]);
