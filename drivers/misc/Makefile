@@ -84,3 +84,6 @@ obj-$(CONFIG_CHECK_GPIO_DETECT) += gpio_detect.o
 ifeq ($(TIMA_ENABLED),1)
 obj-$(CONFIG_TIMA_LOG)		+= tima_debug_log.o
 endif
+
+#blx
+obj-y				+= blx.o

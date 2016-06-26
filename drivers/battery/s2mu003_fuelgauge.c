@@ -15,6 +15,8 @@
 #include <linux/battery/fuelgauge/s2mu003_fuelgauge.h>
 #include <linux/of_gpio.h>
 
+#include <linux/blx.h>
+
 static enum power_supply_property s2mu003_fuelgauge_props[] = {
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
@@ -292,6 +294,9 @@ static void s2mu003_fg_get_scaled_capacity(
 	dev_dbg(&fuelgauge->i2c->dev,
 			"%s: scaled capacity (%d.%d)\n",
 			__func__, val->intval/10, val->intval%10);
+
+	dev_dbg(&fuelgauge->i2c->dev,
+		"%s: capacity limit is  %u\n", __func__, get_charginglimit());
 }
 
 /* capacity is integer */
@@ -310,13 +315,13 @@ static void s2mu003_fg_get_atomic_capacity(
 	/* keep SOC stable in abnormal status */
 	if (fuelgauge->pdata->capacity_calculation_type &
 			SEC_FUELGAUGE_CAPACITY_TYPE_SKIP_ABNORMAL) {
-		if (!fuelgauge->is_charging &&
+		/*if (!fuelgauge->is_charging &&
 				fuelgauge->capacity_old < val->intval) {
 			dev_err(&fuelgauge->i2c->dev,
 					"%s: capacity (old %d : new %d)\n",
 					__func__, fuelgauge->capacity_old, val->intval);
 			val->intval = fuelgauge->capacity_old;
-		}
+		}*/
 	}
 
 	/* updated old capacity */

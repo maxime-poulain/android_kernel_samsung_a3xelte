@@ -11,6 +11,8 @@
  */
 #include <linux/battery/sec_battery.h>
 
+#include <linux/blx.h>
+
 const char *charger_chip_name;
 
 static struct device_attribute sec_battery_attrs[] = {
@@ -53,6 +55,8 @@ static struct device_attribute sec_battery_attrs[] = {
 	SEC_BATTERY_ATTR(store_mode),
 	SEC_BATTERY_ATTR(update),
 	SEC_BATTERY_ATTR(test_mode),
+
+	SEC_BATTERY_ATTR(capacity_battery_charging_limit),
 
 	SEC_BATTERY_ATTR(call),
 	SEC_BATTERY_ATTR(2g_call),
@@ -177,6 +181,10 @@ static int sec_bat_set_charge(
 
 	if (battery->cable_type == POWER_SUPPLY_TYPE_OTG)
 		return 0;
+	if (battery->capacity >= get_charginglimit()) {
+		battery->status = POWER_SUPPLY_STATUS_FULL;
+		enable = false;
+	}
 	val.intval = battery->status;
 	psy_do_property(battery->pdata->charger_name, set,
 		POWER_SUPPLY_PROP_STATUS, val);
@@ -567,7 +575,7 @@ static void sec_bat_set_charging_status(struct sec_battery_info *battery,
 	case POWER_SUPPLY_STATUS_NOT_CHARGING:
 	case POWER_SUPPLY_STATUS_DISCHARGING:
 		if((battery->status == POWER_SUPPLY_STATUS_FULL) ||
-		   (battery->capacity == 100)){
+		   (battery->capacity >= get_charginglimit())){
 #if defined(CONFIG_AFC_CHARGER_MODE) || defined(CONFIG_PREVENT_SOC_JUMP)
 			value.intval = battery->capacity;
 #else
@@ -586,6 +594,8 @@ static void sec_bat_set_charging_status(struct sec_battery_info *battery,
 	default:
 		break;
 	}
+	if (battery->capacity >= get_charginglimit())
+		status = POWER_SUPPLY_STATUS_FULL;
 	battery->status = status;
 }
 
@@ -776,6 +786,14 @@ static bool sec_bat_check_recharge(struct sec_battery_info *battery)
 		return false;
 	}
 #endif
+
+	if (battery->capacity >= get_charginglimit()){
+		battery->charging_mode = SEC_BATTERY_CHARGING_NONE;
+		battery->recharge_check_cnt = 0;
+		battery->is_recharging = false;
+		return false;		
+	}
+
 	if ((battery->status == POWER_SUPPLY_STATUS_CHARGING) &&
 			(battery->pdata->full_condition_type &
 			 SEC_BATTERY_FULL_CONDITION_NOTIMEFULL) &&
@@ -1356,7 +1374,7 @@ static bool sec_bat_temperature_check(
 			 POWER_SUPPLY_STATUS_NOT_CHARGING)) {
 			dev_info(battery->dev,
 					"%s: Safe Temperature\n", __func__);
-			if (battery->capacity >= 100)
+			if (battery->capacity >= get_charginglimit())
 				sec_bat_set_charging_status(battery,
 						POWER_SUPPLY_STATUS_FULL);
 			else	/* Normal Charging */
@@ -1899,8 +1917,9 @@ static bool sec_bat_time_management(
 
 	switch (battery->status) {
 	case POWER_SUPPLY_STATUS_FULL:
-		if (battery->is_recharging && (charging_time >
-			battery->pdata->recharging_total_time)) {
+		if ((battery->is_recharging && (charging_time >
+			battery->pdata->recharging_total_time)) ||
+			battery->capacity >= get_charginglimit()) {
 			dev_info(battery->dev,
 				"%s: Recharging Timer Expired\n", __func__);
 			battery->charging_mode = SEC_BATTERY_CHARGING_NONE;
@@ -1921,7 +1940,7 @@ static bool sec_bat_time_management(
 			battery->pdata->recharging_total_time))) {
 			dev_info(battery->dev,
 			"%s: Recharging Timer Expired\n", __func__);
-			if (battery->capacity >= 100)
+			if (battery->capacity >= get_charginglimit())
 				sec_bat_set_charging_status(battery,
 						POWER_SUPPLY_STATUS_FULL);
 			battery->charging_mode = SEC_BATTERY_CHARGING_NONE;
@@ -1938,7 +1957,7 @@ static bool sec_bat_time_management(
 				"%s: Charging Timer Expired\n", __func__);
 			if (battery->pdata->full_condition_type &
 				SEC_BATTERY_FULL_CONDITION_NOTIMEFULL) {
-				if (battery->capacity >= 100)
+				if (battery->capacity >= get_charginglimit())
 					sec_bat_set_charging_status(battery,
 							POWER_SUPPLY_STATUS_FULL);
 			} else
@@ -2356,11 +2375,11 @@ static void sec_bat_get_battery_info(
 	if (battery->status != POWER_SUPPLY_STATUS_FULL) {
 		battery->capacity = value.intval;
 	} else if ((c_ts.tv_sec - old_ts.tv_sec) >= 30) {
-		if (battery->capacity != 100) {
+		/*if (battery->capacity != 100) {
 			battery->capacity++;
 			pr_info("%s : forced full-charged sequence for the capacity(%d)\n",
 					__func__, battery->capacity);
-		}
+		}*/
 
 		if (value.intval >= battery->pdata->full_condition_soc &&
 			battery->voltage_now >= (battery->pdata->recharge_condition_vcell - 50)) {
@@ -2655,6 +2674,12 @@ static void sec_bat_swelling_fullcharged_check(struct sec_battery_info *battery)
 		break;
 	}
 
+	if (battery->capacity >= get_charginglimit()) {
+		value.intval = POWER_SUPPLY_STATUS_FULL;
+		psy_do_property(battery->pdata->charger_name, set,
+			POWER_SUPPLY_PROP_STATUS, value);
+	}
+
 	if (value.intval == POWER_SUPPLY_STATUS_FULL) {
 		battery->swelling_full_check_cnt++;
 		pr_info("%s: Swelling mode full-charged check (%d)\n",
@@ -2766,12 +2791,23 @@ static void sec_bat_monitor_work(
 	static struct timespec old_ts;
 	struct timespec c_ts;
 
+	if(battery->capacity>=get_charginglimit()) {
+		set_charginglimit(25);
+		dev_info(battery->dev,
+		"%s: decrease to 25 charging limit",__func__);
+	}
+
 	dev_dbg(battery->dev, "%s: Start\n", __func__);
 #if defined(ANDROID_ALARM_ACTIVATED)
 	c_ts = ktime_to_timespec(alarm_get_elapsed_realtime());
 #else
 	c_ts = ktime_to_timespec(ktime_get_boottime());
 #endif
+
+	if (battery->capacity >= get_charginglimit()) {
+		battery->status = POWER_SUPPLY_STATUS_FULL;
+		battery->charging_mode = SEC_BATTERY_CHARGING_NONE;
+	}
 
 	/* monitor once after wakeup */
 	if (battery->polling_in_sleep) {
@@ -3126,6 +3162,10 @@ ssize_t sec_bat_show_attrs(struct device *dev,
 	int i = 0;
 
 	switch (offset) {
+	case CAPACITY_BATTERY_CHARGING_LIMIT:
+		i += scnprintf(buf + i, PAGE_SIZE - i, "%u\n",
+			get_charginglimit());
+		break;
 	case BATT_RESET_SOC:
 		break;
 	case BATT_READ_RAW_SOC:
@@ -3578,6 +3618,19 @@ ssize_t sec_bat_store_attrs(
 	int x = 0;
 	int t[12];
 	switch (offset) {
+	case CAPACITY_BATTERY_CHARGING_LIMIT:
+		{
+			u32 capacity_limit;
+			int error;
+			error = kstrtouint(buf, 10, &capacity_limit);
+			if (error)
+				return error;
+			if (capacity_limit <= 101) {
+				set_charginglimit(capacity_limit);
+			}
+		}
+		ret = count;
+		break;
 	case BATT_RESET_SOC:
 		/* Do NOT reset fuel gauge in charging mode */
 		if (battery->cable_type == POWER_SUPPLY_TYPE_BATTERY ||
@@ -4324,7 +4377,7 @@ static int sec_bat_get_property(struct power_supply *psy,
 				}
 #if defined(CONFIG_AFC_CHARGER_MODE) || defined(CONFIG_PREVENT_SOC_JUMP)
 			if (battery->status == POWER_SUPPLY_STATUS_FULL &&
-				battery->capacity != 100) {
+				battery->capacity < get_charginglimit()) {
 				val->intval = POWER_SUPPLY_STATUS_CHARGING;
 				pr_info("%s: forced full-charged sequence progressing\n", __func__);
 			} else

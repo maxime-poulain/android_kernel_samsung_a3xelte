@@ -14,6 +14,8 @@
 #include <linux/battery/charger/s2mu003_charger.h>
 #include <linux/version.h>
 
+#include <linux/blx.h>
+
 #ifdef CONFIG_USB_HOST_NOTIFY
 #include <linux/usb_notify.h>
 #endif
@@ -203,17 +205,25 @@ static void s2mu003_otg_check_errors(struct s2mu003_charger_data *charger)
 static void s2mu003_enable_charger_switch(struct s2mu003_charger_data *charger,
 		int onoff)
 {
-	/* charger->is_charging = onoff ? true : false; */
+	union power_supply_propval value;
+	psy_do_property("battery",get,
+		POWER_SUPPLY_PROP_CAPACITY, value);
+
+	if (value.intval >= get_charginglimit())
+		onoff = false;
+	charger->is_charging = onoff ? true : false;
 	if (onoff > 0) {
 		pr_info("%s: turn on charger\n", __func__);
 		s2mu003_clr_bits(charger->client, S2MU003_CHG_CTRL3, S2MU003_CHG_EN_MASK);
 		msleep(50);
 		s2mu003_set_bits(charger->client, S2MU003_CHG_CTRL3, S2MU003_CHG_EN_MASK);
 	} else {
-		charger->full_charged = false;
+		charger->full_charged =  value.intval >= get_charginglimit();
 		pr_info("%s: turn off charger\n", __func__);
 		s2mu003_clr_bits(charger->client, S2MU003_CHG_CTRL3, S2MU003_CHG_EN_MASK);
 	}
+
+	pr_info("get_charginglimit() value is %u\n", get_charginglimit());
 }
 
 static void s2mu003_enable_charging_termination(struct i2c_client *i2c,
@@ -571,6 +581,7 @@ static int s2mu003_get_charging_status(struct s2mu003_charger_data *charger)
 {
 	int status = POWER_SUPPLY_STATUS_UNKNOWN;
 	int ret, chg_sts1, chg_sts2;
+	union power_supply_propval value;
 
 	chg_sts1 = s2mu003_reg_read(charger->client, S2MU003_CHG_STATUS1);
 	if (chg_sts1 < 0) {
@@ -615,6 +626,10 @@ static int s2mu003_get_charging_status(struct s2mu003_charger_data *charger)
 			s2mu003_charger_otg_control(charger, false);
 		}
 	}
+	psy_do_property("battery", get,
+		POWER_SUPPLY_PROP_CAPACITY, value);
+	if (value.intval > get_charginglimit())
+		status = POWER_SUPPLY_STATUS_FULL;
 
 	return status;
 }
@@ -777,12 +792,22 @@ static int sec_chg_set_property(struct power_supply *psy,
 			pr_info("%s: OTG mode\n", __func__);
 			s2mu003_charger_otg_control(charger, true);
 		} else {
-			pr_info("%s:[BATT] Set charging"
-				", Cable type = %d\n", __func__, charger->cable_type);
+			psy_do_property("battery", get,
+				POWER_SUPPLY_PROP_CAPACITY, value);
+
+			pr_info("%s:[BATT] Set %s"
+				", Cable type = %d\n", __func__, (value.intval > get_charginglimit()) ? "DISABLING" : "ENABLING", charger->cable_type);
 			/* Enable charger */
-			s2mu003_set_bits(charger->client, 0x8A, 0x20);
-			s2mu003_configure_charger(charger);
-			charger->is_charging = true;
+			if (value.intval <= get_charginglimit()) {
+				s2mu003_set_bits(charger->client, 0x8A, 0x20);
+				s2mu003_configure_charger(charger);
+				charger->is_charging = true;
+			} else {
+				s2mu003_clr_bits(charger->client, S2MU003_CHG_CTRL3, S2MU003_CHG_EN_MASK);
+				s2mu003_clr_bits(charger->client, 0x8A, 0x20);
+				charger->is_charging = false;
+				charger->full_charged = true;
+			}
 		}
 
 		/* If always enabled concept is removed we need to handle
