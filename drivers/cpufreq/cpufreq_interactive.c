@@ -441,6 +441,8 @@ static void cpufreq_interactive_timer(unsigned long data)
 			if (new_freq < tunables->hispeed_freq)
 				new_freq = tunables->hispeed_freq;
 		}
+	} else if (cpu_load <= 15 && pcpu->policy->cur <= 800000){
+		new_freq = pcpu->policy->min;
 	} else {
 		new_freq = choose_freq(pcpu, loadadjfreq);
 		if (new_freq > tunables->hispeed_freq &&
@@ -458,6 +460,8 @@ static void cpufreq_interactive_timer(unsigned long data)
 		spin_unlock_irqrestore(&pcpu->target_freq_lock, flags);
 		goto rearm;
 	}
+
+
 
 	pcpu->hispeed_validate_time = now;
 
