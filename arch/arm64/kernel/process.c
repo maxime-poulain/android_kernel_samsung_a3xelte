@@ -480,8 +480,16 @@ unsigned long get_wchan(struct task_struct *p)
 
 unsigned long arch_align_stack(unsigned long sp)
 {
-	if (!(current->personality & ADDR_NO_RANDOMIZE) && randomize_va_space)
-		sp -= get_random_int() & ~PAGE_MASK;
+	unsigned long rnd = 0;
+	if (!(current->personality & ADDR_NO_RANDOMIZE) && randomize_va_space) {
+#ifdef CONFIG_COMPAT
+		if (test_thread_flag(TIF_32BIT))
+			rnd = get_random_long() & ((1UL << mmap_rnd_compat_bits) - 1);
+		else
+#endif
+		rnd = get_random_long() & ((1UL << mmap_rnd_bits) - 1);
+		sp -= rnd;
+	}
 	return sp & ~0xf;
 }
 
