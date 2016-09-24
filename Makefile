@@ -577,7 +577,7 @@ endif # $(dot-config)
 # Defaults to vmlinux, but the arch makefile usually adds further targets
 all: vmlinux
 
-KBUILD_CFLAGS	+= -O2 -ftree-vectorize -finline-functions $(call cc-disable-warning,maybe-uninitialized,)
+KBUILD_CFLAGS	+= -O2 -mcpu=cortex-a53 -mtune=cortex-a53 -ftree-vectorize -finline-functions $(call cc-disable-warning,maybe-uninitialized,)
 
 include $(srctree)/arch/$(SRCARCH)/Makefile
 
