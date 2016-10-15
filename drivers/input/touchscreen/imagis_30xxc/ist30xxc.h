@@ -600,7 +600,8 @@ struct ist30xx_data {
 	struct notifier_block vbus_nb;
 #endif
 	int lcd_id;
-
+	int dt2w_count;
+	bool dt2w_enable;
 };
 
 extern struct mutex ist30xx_mutex;

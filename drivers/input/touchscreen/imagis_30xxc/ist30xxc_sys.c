@@ -414,7 +414,7 @@ int ist30xx_power_on(struct ist30xx_data *data, bool download)
 int ist30xx_power_off(struct ist30xx_data *data)
 {
 	int rc = 0;
-	if (data->status.power != 0) {
+	if (data->dt2w_enable && data->status.power != 0) {
 		tsp_info("%s()\n", __func__);
 		ist30xx_tracking(TRACK_PWR_OFF);
 		/* VDDIO disable */
@@ -425,15 +425,21 @@ int ist30xx_power_off(struct ist30xx_data *data)
 		if (!rc) /*power is disabled successfully*/
 			data->status.power = 0;
 		data->status.noise_mode = false;
+	} else {
+		if (data->dt2w_enable) {
+			if (data->status.power != 1) {
+				ist30xx_power_on(data,false);
+			}
+		}
 	}
-
 	return 0;
 }
 
 int ist30xx_reset(struct ist30xx_data *data, bool download)
 {
 	tsp_info("%s()\n", __func__);
-	ist30xx_power_off(data);
+	if (!data->dt2w_enable)
+		ist30xx_power_off(data);
 	msleep(10);
 	ist30xx_power_on(data, download);
 
@@ -443,15 +449,18 @@ int ist30xx_reset(struct ist30xx_data *data, bool download)
 int ist30xx_internal_suspend(struct ist30xx_data *data)
 {
 #if IST30XX_GESTURE
-	data->suspend = true;
-    if (data->gesture) {
-        ist30xx_reset(data, false);
-        ist30xx_cmd_gesture(data->client, 3);
-    } else {
-        ist30xx_power_off(data);
-    }
+	if (!data->dt2w_enable) {
+		data->suspend = true;
+		if (data->gesture) {
+			ist30xx_reset(data, false);
+			ist30xx_cmd_gesture(data->client, 3);
+	    } else {
+	    	ist30xx_power_off(data);
+	    }
+	}
 #else
-	ist30xx_power_off(data);
+	if(!data->dt2w_enable)
+		ist30xx_power_off(data);
 #endif
 	return 0;
 }
