@@ -1606,7 +1606,7 @@ static int ist30xx_probe(struct i2c_client *client,
 	data = kzalloc(sizeof(*data), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
-	data->dt2w_enable = false;
+	data->dt2w_enable = true;
 
 #ifdef CONFIG_OF
 	data->dt_data = NULL;
