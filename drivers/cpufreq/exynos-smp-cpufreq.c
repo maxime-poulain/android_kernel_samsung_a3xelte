@@ -49,8 +49,8 @@
 #endif
 
 #define DIV_MASK_ALL		0xffffffff
-#define LIMIT_COLD_VOLTAGE	1350000
-#define MIN_COLD_VOLTAGE	950000
+#define MAXIMUM_CPU_VOLTAGE	1300000
+#define MIN_CPU_VOLTAGE	750000
 #define COLD_VOLT_OFFSET	37500
 
 #define APLL_FREQ(f, a0, a1, a2, a3, a4, a5, a6, b0, b1, m, p, s) \
@@ -225,19 +225,6 @@ static void exynos_cpufreq_boost_frequency(int cpu, unsigned int timeout_ms)
 		pm_qos_update_request(&boost_qos_min[target_cluster], booting_freq);
 }
 
-static unsigned int exynos_get_safe_armvolt(struct cpufreq_policy *policy)
-{
-	struct device *cpu_dev;
-	struct opp *opp;
-	u32 cluster;
-
-	cpu_dev = get_cpu_device(policy->cpu);
-	cluster = cpu_to_cluster(policy->cpu);
-	opp = opp_find_freq_exact(cpu_dev, alt_freq[cluster] * 1000, true);
-
-	return opp_get_voltage(opp);
-}
-
 static void wait_until_divider_stable(void __iomem *div_reg, unsigned long mask)
 {
 	unsigned long timeout = jiffies + msecs_to_jiffies(10);
@@ -343,14 +330,12 @@ static int exynos_regulator_set_voltage(int cluster, unsigned long volt)
 {
 	unsigned long target;
 
-	if (volt > LIMIT_COLD_VOLTAGE)
-		target = volt;
-	else if (volt + cold_offset > LIMIT_COLD_VOLTAGE)
-		target = LIMIT_COLD_VOLTAGE;
-	else if (cold_offset && ((volt + cold_offset) < MIN_COLD_VOLTAGE))
-		target = MIN_COLD_VOLTAGE;
+	if (volt > MAXIMUM_CPU_VOLTAGE)
+		target = MAXIMUM_CPU_VOLTAGE;
+	else if (volt < MIN_CPU_VOLTAGE)
+		target = MIN_CPU_VOLTAGE;
 	else
-		target = volt + cold_offset;
+		target = volt;
 
 	/* 6250(BUCK STEP valye) value depends on pmic */
 	return regulator_set_voltage(reg[cluster], target, target + 6250);
@@ -364,7 +349,7 @@ static int exynos_cpufreq_scale(struct cpufreq_policy *policy,
 	struct device *cpu_dev;
 	struct opp *opp;
 	u32 cur_cluster;
-	unsigned long volt, safe_volt = 0;
+	unsigned long volt;
 	int ret = 0;
 
 	freqs.old = exynos_cpufreq_get(policy->cpu);
@@ -375,9 +360,6 @@ static int exynos_cpufreq_scale(struct cpufreq_policy *policy,
 
 	cur_cluster = cpu_to_cluster(policy->cpu);
 
-	if (freqs.old < alt_freq[cur_cluster] && freqs.new < alt_freq[cur_cluster])
-		safe_volt = exynos_get_safe_armvolt(policy);
-
 	cpu_dev = get_cpu_device(policy->cpu);
 	opp = opp_find_freq_exact(cpu_dev, freqs.new * 1000, true);
 	if (IS_ERR(opp)) {
@@ -386,15 +368,8 @@ static int exynos_cpufreq_scale(struct cpufreq_policy *policy,
 	}
 
 	volt = opp_get_voltage(opp);
-	if ((freqs.new > freqs.old) && !safe_volt) {
+	if (freqs.new > freqs.old) {
 		ret = exynos_regulator_set_voltage(cur_cluster, volt);
-		if (ret) {
-			pr_err("failed to scale voltage up : %d\n", ret);
-			goto out;
-		}
-		set_match_abb(cur_cluster, get_match_abb(cur_cluster, freqs.new * 1000));
-	} else if (safe_volt) {
-		ret = exynos_regulator_set_voltage(cur_cluster, safe_volt);
 		if (ret) {
 			pr_err("failed to scale voltage up : %d\n", ret);
 			goto out;
@@ -415,8 +390,7 @@ static int exynos_cpufreq_scale(struct cpufreq_policy *policy,
 	exynos_ss_freq(cur_cluster, freqs.new, ESS_FLAG_OUT);
 
 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
-	if ((freqs.new < freqs.old) ||
-	    ((freqs.new > freqs.old) && safe_volt)) {
+	if (freqs.new < freqs.old) {
 		set_match_abb(cur_cluster, get_match_abb(cur_cluster, freqs.new * 1000));
 		ret = exynos_regulator_set_voltage(cur_cluster, volt);
 		if (ret)
@@ -957,12 +931,6 @@ static int exynos_cpufreq_exit(struct cpufreq_policy *policy)
 	return 0;
 }
 
-/* Export freq_table to sysfs */
-static struct freq_attr *exynos_cpufreq_attr[] = {
-	&cpufreq_freq_attr_scaling_available_freqs,
-	NULL,
-};
-
 static void exynos_qos_nop(void *info)
 {
 }
@@ -981,6 +949,16 @@ static ssize_t show_cpufreq_table(struct kobject *kobj, struct attribute *attr,
 	}
 	count += sprintf(&buf[count], "\n");
 
+	return count;
+}
+
+static ssize_t show_volt_table(struct cpufreq_policy * policy, char * buf) {
+	return opp_get_cpu_volt_table(buf, get_cpu_device(policy->cpu));
+}
+
+static ssize_t store_volt_table(struct cpufreq_policy * policy, const char * buf, size_t count)
+{
+	opp_set_cpu_volt_table(buf, get_cpu_device(policy->cpu));
 	return count;
 }
 
@@ -1095,6 +1073,21 @@ static ssize_t store_cpufreq_self_discharging(struct kobject *kobj, struct attri
 	return count;
 }
 #endif
+
+struct freq_attr cpu0_volt_control = {
+	.attr = { .name = "UV_mV_table",
+		  .mode = 0664,
+		},
+	.show = show_volt_table,
+	.store = store_volt_table,
+};
+
+/* Export freq_table to sysfs */
+static struct freq_attr *exynos_cpufreq_attr[] = {
+	&cpufreq_freq_attr_scaling_available_freqs,
+	&cpu0_volt_control,
+	NULL,
+};
 
 define_one_global_ro(cpufreq_table);
 define_one_global_rw(cpufreq_min_limit);

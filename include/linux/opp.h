@@ -48,6 +48,10 @@ int opp_enable(struct device *dev, unsigned long freq);
 
 int opp_disable(struct device *dev, unsigned long freq);
 
+ssize_t opp_get_cpu_volt_table(char *buf, struct device *dev);
+
+int opp_set_cpu_volt_table(const char *buf, struct device *dev);
+
 struct srcu_notifier_head *opp_get_notifier(struct device *dev);
 #else
 static inline unsigned long opp_get_voltage(struct opp *opp)

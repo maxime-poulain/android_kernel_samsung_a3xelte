@@ -24,6 +24,7 @@
 #include <linux/opp.h>
 #include <linux/of.h>
 #include <linux/export.h>
+#include <linux/cpu.h>
 
 /*
  * Internal data structure organization with the OPP layer library is as
@@ -376,6 +377,39 @@ struct opp *opp_find_freq_floor(struct device *dev, unsigned long *freq)
 	return opp;
 }
 EXPORT_SYMBOL_GPL(opp_find_freq_floor);
+
+ssize_t opp_get_cpu_volt_table(char *buf,struct device *dev) {
+	struct device_opp *dev_opp;
+	struct opp *current_opp;
+	ssize_t count = 0;
+
+	dev_opp = find_device_opp(dev);
+	list_for_each_entry_rcu(current_opp, &dev_opp->opp_list, node) {
+		count += snprintf(buf + count, PAGE_SIZE, "%lumhz: %lu mV\n", opp_get_freq(current_opp)/1000000, opp_get_voltage(current_opp)/1000);
+	}
+	return count;
+}
+EXPORT_SYMBOL_GPL(opp_get_cpu_volt_table);
+
+int opp_set_cpu_volt_table(const char *buf,struct device *dev)
+{
+	int ret = 0, step = 14, i = 0;
+	unsigned long u[step];
+	struct opp *current_opp;
+	struct device_opp *dev_opp;
+
+	if (buf == NULL)
+		return 0;
+	ret = sscanf(buf, "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu",&u[0],&u[1],&u[2],&u[3],&u[4],&u[5],&u[6],&u[7],&u[8],&u[9],&u[10],&u[11],&u[12],&u[13]);
+	if (ret != step)
+		return ret;
+	dev_opp = find_device_opp(dev);
+	list_for_each_entry_rcu(current_opp, &dev_opp->opp_list, node) {
+		current_opp->u_volt = u[i++] * 1000;
+	}
+	return 0;
+}
+EXPORT_SYMBOL_GPL(opp_set_cpu_volt_table);
 
 /**
  * opp_add()  - Add an OPP table from a table definitions
