@@ -19,3 +19,4 @@ cp arch/arm64/boot/dt.img $mkboot_root_folder/$mkboot_project_name/dt.img;
 cd $mkboot_root_folder;
 rm $boot_image_name;
 ./mkboot $mkboot_project_name $boot_image_name;
+echo SEANDROIDENFORCE >> $boot_image_name
