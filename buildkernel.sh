@@ -1,7 +1,7 @@
 #!/bin/bash
 
 export ARCH=arm64;
-export CROSS_COMPILE="ccache /home/khaon/android/linaro-64/bin/aarch64-linux-gnu-";
+export CROSS_COMPILE="ccache /home/khaon/android/linaro-64/bin/aarch64-linux-android-";
 
 export mkboot_root_folder=/home/khaon/android/mkbootimg_tools;
 export mkboot_project_name=mm-boot;
